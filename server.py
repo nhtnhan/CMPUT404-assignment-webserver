@@ -1,7 +1,6 @@
 #  coding: utf-8 
 import socketserver
 import os
-import mimetypes
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -29,7 +28,7 @@ import mimetypes
 # try: curl -v -X GET http://127.0.0.1:8080/
 
 NEWLINE = "\r\n"
-
+BASEURL = "http://127.0.0.1:8080"
 
 class MyWebServer(socketserver.BaseRequestHandler):
 
@@ -38,33 +37,74 @@ class MyWebServer(socketserver.BaseRequestHandler):
         
         # PROCESS DATA TO HEADERS
         # retrieve method, path, protocol from the first line
-        method,path,protocol = [part.strip() for part in self.data.splitlines()[0].decode().split()]
-        if (method =="GET"):
-            self.processRequest(path)
-        else:
-            # 405
-            code = 'HTTP/1.1 405 Method not allowed' + NEWLINE
-            self.request.sendall(bytearray(code,'utf-8'))
-            self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
+        if (self.data):
+            method,path,protocol = [part.strip() for part in self.data.splitlines()[0].decode().split()]
+            if (method =="GET"):
+                self.processRequest(path)
+            else:
+                # 405
+                code = 'HTTP/1.1 405 Method not allowed' + NEWLINE
+                self.request.sendall(bytearray(code,'utf-8'))
+                self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
     
     def processRequest(self,path):
         ppath = "www"+path
-        # header = {}
 
         # check unsecured path:
         if (".." not in ppath):
             if (os.path.isdir(ppath) or os.path.isfile(ppath)):
-                # print("200 OK")
-                if ("." not in ppath):
+                # PROCESS HEADER AND CONTENT
+                if (os.path.isdir(ppath)):
                     filetype ="html"
+                    if (path[-1]!="/"):
+                        file = open(ppath+"/"+"index.html","rb")
+                        content = file.read()
+                        
+                        # SEND HEADER
+                        code = 'HTTP/1.1 301 Moved Permanently' + NEWLINE
+                        content_type = 'Content-Type: text/'+filetype + NEWLINE
+                        # location = 'Location: '+BASEURL+"/"+ppath+"/"+ NEWLINE
+
+                        self.request.sendall(bytearray(code,'utf-8'))
+                        self.request.sendall(bytearray(content_type,'utf-8'))
+                        # self.request.sendall(bytearray(location,'utf-8'))
+                        self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
+                        
+                        #SEND CONTENT
+                        self.request.sendall(content)
+                        file.close()
+
+                    else:
+                        file = open(ppath+"index.html","rb")
+                        content = file.read()
+
+                        # SEND HEADER
+                        code = 'HTTP/1.1 200 OK' + NEWLINE
+                        content_type = 'Content-Type: text/'+filetype + NEWLINE
+                        self.request.sendall(bytearray(code,'utf-8'))
+                        self.request.sendall(bytearray(content_type,'utf-8'))
+                        self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
+
+                        #SEND CONTENT
+                        self.request.sendall(content)
+                        file.close()
+                    
                 else:
                     filetype = ppath.split(".")[-1]
-                #PROCESS APPROPRIATE HEADER AND CONTENT
-                code = 'HTTP/1.1 200 OK' + NEWLINE
-                content_type = 'Content-Type: text/'+filetype + NEWLINE
-                self.request.sendall(bytearray(code,'utf-8'))
-                self.request.sendall(bytearray(content_type,'utf-8'))
-                self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
+                    file = open(ppath,"rb")
+                    content = file.read()
+                                    
+                    # SEND HEADER
+                    code = 'HTTP/1.1 200 OK' + NEWLINE
+                    content_type = 'Content-Type: text/'+filetype + NEWLINE
+                    self.request.sendall(bytearray(code,'utf-8'))
+                    self.request.sendall(bytearray(content_type,'utf-8'))
+                    self.request.sendall(bytearray("Connection: closed"+NEWLINE+NEWLINE,'utf-8'))
+
+                    #SEND CONTENT
+                    self.request.sendall(content)
+                    file.close()
+                
             else:
                 code = 'HTTP/1.1 404 Not found' + NEWLINE
                 self.request.sendall(bytearray(code,'utf-8'))
